@@ -15,7 +15,8 @@ export default function Patients() {
   const [id, setId] = useState();
   const [name, setName] = useState();
   const [age, setAge] = useState();
-  const [searchWarning,setSearchWarning]=useState(false)
+  const [searchWarning, setSearchWarning] = useState(false);
+  const [trigger,setTrigger]=useState(false);
   const navigate = useNavigate();
   let decodeToken = "";
   // let decodeToken = jwt_decode(localStorage.getItem("token"))
@@ -23,9 +24,10 @@ export default function Patients() {
   console.log(decodeToken);
 
   const [show, setShow] = useState(false);
+  const [chosenPatient,setChosenPatient]=useState({})
 
   const handleClose = () => setShow(false);
-  const handleShow = () => setShow(true);
+  const handleShow = (data) => {setShow(true); setChosenPatient(data);}
 
   useEffect(() => {
     axios.get("/patient").then((res) => {
@@ -33,28 +35,30 @@ export default function Patients() {
       setloading(false);
       console.log(res.data);
     });
-  }, []);
+  }, [trigger]);
 
-  function addPatient() {
+  function addPatient(e) {
+    e?.preventDefault();
     axios.post("/patient", { id, name, age }).then((res) => {
       console.log(res);
-      setPatient(res.data);
+      setTrigger(!trigger);
     });
   }
 
   function deletePatient(e, _id) {
+    e?.preventDefault();
     axios.delete(`/patient/${_id}`).then((res) => {
-      setPatient(res.data);
+      setTrigger(!trigger);
     });
   }
 
-  function updatePatient(e, Id) {
+  function updatePatient(e) {
     e.preventDefault();
     console.log(e.currentTarget);
-    axios.put(`/patient/${Id}`, { id, name, age }).then((res) => {
-      setPatient(res.data);
+    axios.put(`/patient/${chosenPatient._id}`, { id:chosenPatient._id, name, age }).then((res) => {
+      setTrigger(!trigger);
     });
-    console.log(Id);
+    console.log(id);
   }
 
   if (localStorage.getItem("token")) {
@@ -63,25 +67,28 @@ export default function Patients() {
 
   if (loading) return <Loading />;
   const handleSearch = (e) => {
-      setSearchWarning(false)
+    setSearchWarning(false);
     e.preventDefault();
-    axios.get(`/patient/${e.target[0].value}`).then((res)=>{
+    axios
+      .get(`/patient/${e.target[0].value}`)
+      .then((res) => {
         console.log(e.target[0].value);
-        if(res.data)
-        navigate(`/patient/${e.target[0].value}`);
-        else
-        setSearchWarning(true)
-    }).catch((err)=>{
-        
-        console.log('error searching patient:',err);
-    })
-    
+        if (res.data) navigate(`/patient/${e.target[0].value}`);
+        else setSearchWarning(true);
+      })
+      .catch((err) => {
+        console.log("error searching patient:", err);
+      });
   };
   return (
     <div className="doctor">
       <Row>
         <Form onSubmit={handleSearch}>
-        {searchWarning?<Alert variant='danger'>Couldn't find user with that ID</Alert>:''}
+          {searchWarning ? (
+            <Alert variant="danger">Couldn't find user with that ID</Alert>
+          ) : (
+            ""
+          )}
           <Form.Control
             placeholder="Search for a patient"
             onChange={(e) => console.log(e.target.value)}
@@ -95,14 +102,13 @@ export default function Patients() {
       </Row>
       <Row xs={1} md={2} className="g-4">
         {patient.map((item) => {
-          console.log(item);
           return (
             <Col>
               <Card>
                 {decodeToken.isAdmin && (
                   <Card.Body>
-                    <Button onClick={handleShow} variant="outline-primary">
-                      Update
+                    <Button onClick={()=>handleShow()} variant="outline-primary">
+                      Update 
                     </Button>{" "}
                     <Button
                       onClick={(e) => {
@@ -114,22 +120,23 @@ export default function Patients() {
                     </Button>{" "}
                   </Card.Body>
                 )}
-<Link to={`/patient/${item._id}`}>
-                  
-                 
+                <Link to={`/patient/${item._id}`} style={{textDecoration:'none'}}>
+                  <Card.Body>
+                    <Card.Title>{item.name}</Card.Title>
+                    <Card.Title>
+                      <h5>
+                        {" ID:"}
+                        <span>{item._id}</span>
+                      </h5>
+                    </Card.Title>
+                    <Card.Title>
+                      {" "}
+                      <h5>{item.age}</h5>
+                    </Card.Title>
+                  </Card.Body>{" "}
+                </Link>
                 <Card.Body>
-                  <Card.Title>{item.name}</Card.Title>
-                  <Card.Title>
-                    
-                    <h5>{" ID:"}<span>{item._id}</span></h5>
-                  </Card.Title>
-                  <Card.Title>
-                    {" "}
-                    <h5>{item.age}</h5>
-                  </Card.Title>
-                </Card.Body> </Link>
-                <Card.Body>
-                  <Button onClick={handleShow} variant="outline-primary">
+                  <Button onClick={()=>handleShow(item)} variant="outline-primary">
                     Update
                   </Button>{" "}
                   <Button
@@ -145,17 +152,9 @@ export default function Patients() {
               <>
                 <Modal show={show} onHide={handleClose}>
                   <Modal.Header closeButton>
-                    <Modal.Title>Update</Modal.Title>
+                    <Modal.Title>Update {chosenPatient.name}</Modal.Title>
                   </Modal.Header>
                   <Modal.Body>
-                    <input
-                      className="updateInput"
-                      type="number"
-                      onChange={(e) => {
-                        setId(e.target.value);
-                      }}
-                      placeholder="id"
-                    ></input>
                     <input
                       className="updateInput"
                       onChange={(e) => setName(e.target.value)}
@@ -172,7 +171,7 @@ export default function Patients() {
                     <Button
                       variant="primary"
                       onClick={(e) => {
-                        updatePatient(e, item._id);
+                        updatePatient(e);
                         handleClose();
                       }}
                     >
@@ -189,7 +188,7 @@ export default function Patients() {
       <div className="add">
         <Card className="text-center">
           <Card.Body>
-            <Card.Title>Add Doctors</Card.Title>
+            <Card.Title>Add Patient</Card.Title>
             <Card.Text>
               <Form>
                 <Form.Group className="mb-3">
@@ -215,7 +214,7 @@ export default function Patients() {
                   />
                 </Form.Group>
 
-                <Button onClick={() => addPatient()} variant="primary">
+                <Button onClick={addPatient} variant="primary">
                   Add
                 </Button>
               </Form>
